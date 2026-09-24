@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "hitspin",
+  "version": "${version}",
+  "name": "Hit Spin",
+  "description": "Camera spin effects after hitting a player, with configurable random rotations and themes.",
+  "authors": ["Adixu_YT"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": { "client": ["com.adixuyt.hitspin.HitSpinClient"] },
+  "mixins": ["hitspin.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "1.21.4",
+    "fabric-api": "*"
+  }
+}

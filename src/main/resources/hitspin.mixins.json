@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "com.adixuyt.hitspin.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["AttackMixin"],
+  "injectors": { "defaultRequire": 1 }
+}
