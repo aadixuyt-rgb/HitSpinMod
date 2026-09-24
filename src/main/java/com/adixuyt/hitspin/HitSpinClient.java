@@ -33,6 +33,7 @@ public class HitSpinClient implements ClientModInitializer {
     private static long animationStart;
     private static int phase; // 0 = outbound, 1 = return
     private static float startYaw, startPitch, targetYaw, targetPitch;
+    private static float origYaw, origPitch; // pozycja kamery sprzed obrotu
     private static Rotation currentRotation;
 
     public enum Rotation {
@@ -68,6 +69,8 @@ public class HitSpinClient implements ClientModInitializer {
         currentRotation = CONFIG.randomMode ? choices.get(RANDOM.nextInt(choices.size())) : choices.get(CONFIG.sequenceIndex++ % choices.size());
         startYaw = client.player.getYaw();
         startPitch = client.player.getPitch();
+        origYaw = startYaw;
+        origPitch = startPitch;
         targetYaw = startYaw + currentRotation.yaw;
         targetPitch = clampPitch(startPitch + currentRotation.pitch);
         animationStart = System.nanoTime();
@@ -98,8 +101,8 @@ public class HitSpinClient implements ClientModInitializer {
                 startYaw = targetYaw; startPitch = targetPitch;
                 targetYaw = oldStartYaw; targetPitch = oldStartPitch;
             } else {
-                client.player.setAngles(startYaw, startPitch);
-                client.player.setHeadYaw(startYaw);
+                client.player.setAngles(origYaw, origPitch);
+                client.player.setHeadYaw(origYaw);
                 spinning = false;
             }
         }
