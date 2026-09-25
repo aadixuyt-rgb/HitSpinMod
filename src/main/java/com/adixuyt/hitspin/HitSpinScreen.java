@@ -3,132 +3,55 @@ package com.adixuyt.hitspin;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public class HitSpinScreen extends Screen {
-    // Wirtualny rozmiar panelu - całość jest automatycznie skalowana do okna gry.
-    private static final int W = 520, H = 418;
     private static final int WHITE = 0xFFEAF0FF, GREY = 0xFF9AA4B8;
 
     private final Screen parent;
     private float s = 1f, ox, oy;
-    private boolean draggingSlider, inputFocused;
-    private String input = "";
+    private int W = 580, H = 472;
 
-    private record Sprite(String[] rows, Map<Character, Integer> pal) {}
-    private record Theme(String name, int primary, int secondary, int dark, Sprite sprite) {}
+    private enum Field { NONE, DURATION, SEARCH }
+    private Field focused = Field.NONE;
+    private String durationInput = "";
+    private String searchQuery = "";
+    private boolean draggingDuration;
+    private int draggingRotation = -1;
+    private boolean autostackingExpanded;
+    private int scrollOffset;
 
-    // ---------- Zwierzaki (pixel art 12x12) ----------
-    private static final Sprite FISH = new Sprite(new String[]{
-            "............",
-            "....oooo..o.",
-            "..ooMMMMooao",
-            ".oMMMMMMMoaa",
-            "oMMwwMMMMMoa",
-            "oMMweMMMMMoa",
-            "oMMMMMMMMMoa",
-            "oLLMMMMMMoaa",
-            ".oLLLLLLLoo.",
-            "..ooLLLLooao",
-            "....oooo..o.",
-            "............"},
-            Map.of('o', 0xFF1E3A8A, 'M', 0xFF38BDF8, 'L', 0xFF7DD3FC, 'w', 0xFFFFFFFF, 'e', 0xFF0B1220, 'a', 0xFF8B5CF6));
+    private String cachedQuery = null;
+    private List<Item> cachedResults = new ArrayList<>();
 
-    private static final Sprite FROG = new Sprite(new String[]{
-            "............",
-            ".oo......oo.",
-            "oWWooooooWWo",
-            "oWEGGGGGGEWo",
-            "oGGGGGGGGGGo",
-            "oGGGGGGGGGGo",
-            "oGGdGGGGdGGo",
-            "oGGGGGGGGGGo",
-            "ooGmmmmmmGoo",
-            ".oGGGGGGGGo.",
-            "..oooooooo..",
-            "............"},
-            Map.of('o', 0xFF14532D, 'W', 0xFFFFFFFF, 'E', 0xFF0B1220, 'G', 0xFF4ADE80, 'd', 0xFF166534, 'm', 0xFFF87171));
-
-    private static final Sprite DRAGON = new Sprite(new String[]{
-            "o..........o",
-            "oo........oo",
-            ".oooooooooo.",
-            "oRRRRRRRRRRo",
-            "oRYERRRRYERo",
-            "oRRRRRRRRRRo",
-            "oRRRRttRRRRo",
-            ".oRRtttttRRo",
-            ".oRRRRRRRRo.",
-            "..oRRRRRRo..",
-            "...oooooo...",
-            "............"},
-            Map.of('o', 0xFF7F1D1D, 'R', 0xFFEF4444, 'Y', 0xFFFDE047, 'E', 0xFF0B1220, 't', 0xFFFDBA74));
-
-    private static final Sprite FOX = new Sprite(new String[]{
-            "oo........oo",
-            "oOo......oOo",
-            "oOOooooooOOo",
-            "oOOOOOOOOOOo",
-            "oOEOOOOOOEOo",
-            "oOOOOOOOOOOo",
-            "oWWOOOOOOWWo",
-            ".oWWWnnWWWo.",
-            "..oWWWWWWo..",
-            "...oWWWWo...",
-            "....oooo....",
-            "............"},
-            Map.of('o', 0xFF7C2D12, 'O', 0xFFF97316, 'W', 0xFFFFFFFF, 'E', 0xFF0B1220, 'n', 0xFF0B1220));
-
-    private static final Sprite CAT = new Sprite(new String[]{
-            "oo........oo",
-            "oPo......oPo",
-            "oPPooooooPPo",
-            "oPPPPPPPPPPo",
-            "oPGEPPPPGEPo",
-            "oPPPPPPPPPPo",
-            "oPPPPnnPPPPo",
-            ".oPPPmmPPPo.",
-            "..oPPPPPPo..",
-            "...oooooo...",
-            "............",
-            "............"},
-            Map.of('o', 0xFF4C1D95, 'P', 0xFFA78BFA, 'G', 0xFF86EFAC, 'E', 0xFF0B1220, 'n', 0xFFF0ABFC, 'm', 0xFF4C1D95));
-
-    private static final Sprite PANDA = new Sprite(new String[]{
-            "BBB......BBB",
-            "BBBooooooBBB",
-            ".oWWWWWWWWo.",
-            "oWWWWWWWWWWo",
-            "oWBBWWWWBBWo",
-            "oWBEWWWWEBWo",
-            "oWWWWnnWWWWo",
-            ".oWWWmmWWWo.",
-            "..oWWWWWWo..",
-            "...oooooo...",
-            "............",
-            "............"},
-            Map.of('W', 0xFFF3F4F6, 'B', 0xFF111827, 'o', 0xFF9CA3AF, 'E', 0xFFFFFFFF, 'n', 0xFF111827, 'm', 0xFF111827));
+    private record Theme(String name, int primary, int secondary, int dark) {}
 
     private static final Theme[] THEMES = {
-            new Theme("Ryba", 0xFF38BDF8, 0xFF8B5CF6, 0xFF0B1730, FISH),
-            new Theme("Żaba", 0xFF4ADE80, 0xFFA3E635, 0xFF0A1E12, FROG),
-            new Theme("Smok", 0xFFEF4444, 0xFFF97316, 0xFF230C0C, DRAGON),
-            new Theme("Lis", 0xFFF59E0B, 0xFFFB7185, 0xFF231406, FOX),
-            new Theme("Kot", 0xFFA78BFA, 0xFFF0ABFC, 0xFF170E28, CAT),
-            new Theme("Panda", 0xFFE5E7EB, 0xFF94A3B8, 0xFF14171C, PANDA)
+            new Theme("Niebieski", 0xFF38BDF8, 0xFF8B5CF6, 0xFF0B1730),
+            new Theme("Zielony", 0xFF4ADE80, 0xFFA3E635, 0xFF0A1E12),
+            new Theme("Czerwony", 0xFFEF4444, 0xFFF97316, 0xFF230C0C),
+            new Theme("Pomarańczowy", 0xFFF59E0B, 0xFFFB7185, 0xFF231406),
+            new Theme("Fioletowy", 0xFFA78BFA, 0xFFF0ABFC, 0xFF170E28),
+            new Theme("Biały", 0xFFE5E7EB, 0xFF94A3B8, 0xFF14171C)
     };
 
-    // Kolejność jak w HitSpinClient.Rotation
     private static final String[] ROT_LABELS = {
-            "360° obrót", "90° w lewo", "90° w prawo", "90° w górę", "90° w dół",
-            "Ukos lewo-góra", "Ukos prawo-góra", "Ukos lewo-dół", "Ukos prawo-dół"};
+            "360°", "Lewo", "Prawo", "Góra", "Dół", "Skos G-L", "Skos G-P", "Skos D-L", "Skos D-P"};
     private static final String[] ROT_SYMBOLS = {"⟳", "←", "→", "↑", "↓", "↖", "↗", "↙", "↘"};
     private static final int[] ROT_COLORS = {
             0xFFA855F7, 0xFF3B9CFF, 0xFF22C55E, 0xFFF59E0B, 0xFFEC4899,
             0xFF14B8A6, 0xFFF97316, 0xFF6366F1, 0xFFEF4444};
+
+    // Geometria siatki rodzajów obrotów (wirtualne jednostki).
+    private static final int GRID_X = 244, GRID_Y = 106, CELL_W = 104, CELL_H = 74, GAP = 6, COLS = 3;
 
     public HitSpinScreen(Screen parent) {
         super(Text.literal("Hit Spin"));
@@ -137,13 +60,14 @@ public class HitSpinScreen extends Screen {
 
     @Override
     protected void init() {
-        input = fmt(HitSpinClient.CONFIG.durationSeconds);
-        inputFocused = false;
+        durationInput = fmt(HitSpinClient.CONFIG.durationSeconds);
+        focused = Field.NONE;
     }
 
     // ---------- Narzędzia ----------
     private static String fmt(double d) { return String.format(Locale.US, "%.2f", d); }
     private static double clamp(double v, double a, double b) { return Math.max(a, Math.min(b, v)); }
+    private static int clampI(int v, int a, int b) { return Math.max(a, Math.min(b, v)); }
     private Theme theme() { return THEMES[HitSpinClient.CONFIG.theme]; }
 
     private static int mix(int a, int b, float t) {
@@ -154,7 +78,8 @@ public class HitSpinScreen extends Screen {
     }
 
     private void layout() {
-        s = Math.min(1.6f, Math.min((width - 8f) / W, (height - 8f) / H));
+        H = 472 + (autostackingExpanded ? 112 : 0);
+        s = Math.min(1.5f, Math.min((width - 8f) / W, (height - 8f) / H));
         if (s < 0.2f) s = 0.2f;
         ox = (width - W * s) / 2f;
         oy = (height - H * s) / 2f;
@@ -182,6 +107,15 @@ public class HitSpinScreen extends Screen {
         rr(c, x + 1, y + 1, w - 2, h - 2, Math.max(0, r - 1), fill);
     }
 
+    private void circle(DrawContext c, int cx, int cy, int radius, int col) {
+        rr(c, cx - radius, cy - radius, radius * 2, radius * 2, radius, col);
+    }
+
+    private void circleRing(DrawContext c, int cx, int cy, int radius, int ring, int fill) {
+        circle(c, cx, cy, radius, ring);
+        circle(c, cx, cy, radius - 2, fill);
+    }
+
     private void txt(DrawContext c, String str, int x, int y, int col) {
         c.drawText(textRenderer, str, x, y, col, false);
     }
@@ -199,20 +133,13 @@ public class HitSpinScreen extends Screen {
         m.pop();
     }
 
-    private void sprite(DrawContext c, Sprite sp, int x, int y, int sc) {
-        for (int r = 0; r < sp.rows().length; r++) {
-            String row = sp.rows()[r];
-            for (int q = 0; q < row.length() && q < 12; q++) {
-                Integer col = sp.pal().get(row.charAt(q));
-                if (col != null) c.fill(x + q * sc, y + r * sc, x + (q + 1) * sc, y + (r + 1) * sc, col);
-            }
-        }
+    private void check(DrawContext c, int x, int y) {
+        int[][] p = {{-3, 0}, {-2, 1}, {-1, 2}, {0, 1}, {1, 0}, {2, -1}, {3, -2}};
+        for (int[] q : p) c.fill(x + q[0], y + q[1], x + q[0] + 1, y + q[1] + 1, 0xFFFFFFFF);
     }
 
-    private void check(DrawContext c, int x, int y) {
-        int[][] p = {{2, 6}, {3, 7}, {4, 8}, {5, 7}, {6, 6}, {7, 5}, {8, 4}, {9, 3}};
-        for (int[] q : p) c.fill(x + q[0], y + q[1], x + q[0] + 1, y + q[1] + 2, 0xFFFFFFFF);
-    }
+    private int cellX(int i) { return GRID_X + (i % COLS) * (CELL_W + GAP); }
+    private int cellY(int i) { return GRID_Y + (i / COLS) * (CELL_H + GAP); }
 
     // ---------- Rysowanie ----------
     @Override
@@ -233,137 +160,190 @@ public class HitSpinScreen extends Screen {
         m.translate(ox, oy, 0f);
         m.scale(s, s, 1f);
 
-        // Tło panelu
-        rrb(c, 0, 0, W, H, 14, mix(dark, t.primary(), 0.55f), dark);
+        rrb(c, 0, 0, W, H, 22, mix(dark, t.primary(), 0.55f), dark);
 
         // Nagłówek
-        rr(c, 6, 6, W - 12, 60, 10, header);
-        rr(c, 12, 14, 44, 44, 10, mix(dark, t.primary(), 0.28f));
-        sprite(c, t.sprite(), 16, 18, 3);
-        big(c, "Hit Spin", 62, 9, 2f, t.primary());
-        txt(c, "Mod do efektów po trafieniu", 62, 29, mix(t.primary(), 0xFFFFFFFF, 0.35f));
-        txt(c, "by Adixu_YT", 62, 39, t.secondary());
+        rr(c, 6, 6, W - 12, 60, 18, header);
+        circle(c, 36, 36, 22, mix(dark, t.primary(), 0.30f));
+        txtShadow(c, "⟳", 36 - textRenderer.getWidth("⟳") / 2, 30, t.primary());
+        big(c, "Hit Spin", 66, 9, 2f, t.primary());
+        txt(c, "by Adixu_YT", 66, 29, mix(t.primary(), 0xFFFFFFFF, 0.35f));
 
-        // Motywy (kwadratowe przyciski, lewy górny róg)
         for (int i = 0; i < THEMES.length; i++) {
-            int bx = 62 + i * 18, by = 50;
-            if (cfg.theme == i) {
-                c.fill(bx - 2, by - 2, bx + 14, by + 14, 0xFFFFFFFF);
-            } else {
-                c.fill(bx - 1, by - 1, bx + 13, by + 13, 0xFF000000);
-            }
-            c.fill(bx, by, bx + 12, by + 12, THEMES[i].primary());
+            int bx = 66 + i * 20, by = 41;
+            boolean on = cfg.theme == i;
+            circleRing(c, bx + 6, by + 6, on ? 9 : 7, on ? 0xFFFFFFFF : 0xFF000000, THEMES[i].primary());
         }
-        txt(c, "Motyw: " + t.name(), 62 + THEMES.length * 18 + 4, 52, GREY);
 
-        // Przycisk zamknięcia
-        boolean hoverClose = in(vmx, vmy, W - 44, 16, 26, 26);
-        rr(c, W - 44, 16, 26, 26, 8, hoverClose ? 0xFFB91C1C : 0xFF26314D);
-        txtShadow(c, "×", W - 44 + 13 - textRenderer.getWidth("×") / 2, 25, 0xFFFFFFFF);
+        boolean hoverClose = in(vmx, vmy, W - 42, 14, 26, 26);
+        circle(c, W - 29, 27, 13, hoverClose ? 0xFFB91C1C : 0xFF26314D);
+        txtShadow(c, "×", W - 29 - textRenderer.getWidth("×") / 2, 21, 0xFFFFFFFF);
 
         // ----- Lewa kolumna -----
-        // Karta: włącznik
-        rrb(c, 10, 72, 246, 58, 10, cardBorder, card);
-        rr(c, 22, 82, 38, 20, 10, cfg.enabled ? t.primary() : 0xFF39445A);
-        rr(c, cfg.enabled ? 42 : 24, 84, 16, 16, 8, 0xFFFFFFFF);
+        rrb(c, 10, 72, 224, 54, 16, cardBorder, card);
+        int togW = 40, togH = 20;
+        rr(c, 22, 89, togW, togH, togH / 2, cfg.enabled ? t.primary() : 0xFF39445A);
+        circle(c, cfg.enabled ? 22 + togW - 10 : 22 + 10, 89 + togH / 2, 8, 0xFFFFFFFF);
         String state = cfg.enabled ? "Włączony" : "Wyłączony";
-        big(c, state, 68, 85, 1.3f, cfg.enabled ? t.primary() : GREY);
-        if (cfg.enabled) {
-            int tw = (int) (textRenderer.getWidth(state) * 1.3f);
-            rr(c, 68 + tw + 6, 89, 6, 6, 3, t.primary());
+        big(c, state, 70, 90, 1.15f, cfg.enabled ? t.primary() : GREY);
+        txt(c, "Kamera obraca się po trafieniu gracza", 22, 112, GREY);
+
+        rrb(c, 10, 132, 224, 112, 16, cardBorder, card);
+        txtShadow(c, "Czas obrotu", 22, 141, WHITE);
+        txt(c, "od 0,01 s do 2,00 s", 22, 153, GREY);
+        rrb(c, 128, 148, 66, 18, 9, focused == Field.DURATION ? t.primary() : 0xFF3A465F, 0xFF0C1226);
+        txt(c, durationInput, 137, 153, 0xFFFFFFFF);
+        if (focused == Field.DURATION && (System.currentTimeMillis() / 500) % 2 == 0) {
+            int cx = 137 + textRenderer.getWidth(durationInput);
+            c.fill(cx, 151, cx + 1, 163, t.primary());
         }
-        txt(c, "Po trafieniu gracza kamera", 22, 108, GREY);
-        txt(c, "wykona wybrany obrót.", 22, 118, GREY);
+        txt(c, "s", 198, 153, GREY);
 
-        // Karta: czas obrotu
-        rrb(c, 10, 136, 246, 116, 10, cardBorder, card);
-        txtShadow(c, "Czas obrotu", 22, 145, WHITE);
-        txt(c, "od 0,01 s do 4,00 s", 22, 157, GREY);
-        txt(c, "Wpisz dokładną wartość:", 22, 175, WHITE);
-        rrb(c, 150, 170, 72, 18, 5, inputFocused ? t.primary() : 0xFF3A465F, 0xFF0C1226);
-        txt(c, input, 156, 175, 0xFFFFFFFF);
-        if (inputFocused && (System.currentTimeMillis() / 500) % 2 == 0) {
-            int cx = 156 + textRenderer.getWidth(input);
-            c.fill(cx, 173, cx + 1, 185, t.primary());
-        }
-        txt(c, "s", 210, 175, GREY);
+        int durKnobX = 24 + (int) ((cfg.durationSeconds - 0.01) / 1.99 * 200);
+        rr(c, 24, 186, 200, 6, 3, 0xFF26324C);
+        rr(c, 24, 186, Math.max(6, durKnobX - 24), 6, 3, t.primary());
+        circle(c, durKnobX, 189, 8, 0xFFFFFFFF);
+        circle(c, durKnobX, 189, 5, t.primary());
+        txt(c, "0,01 s", 22, 202, GREY);
+        String maxLabel = "2,00 s";
+        txt(c, maxLabel, 226 - textRenderer.getWidth(maxLabel), 202, GREY);
+        txt(c, "Wpisz liczbę albo przeciągnij suwak", 22, 216, mix(GREY, dark, 0.35f));
 
-        int knobX = 24 + (int) ((cfg.durationSeconds - 0.01) / 3.99 * 210);
-        rr(c, 24, 208, 210, 6, 3, 0xFF26324C);
-        rr(c, 24, 208, Math.max(6, knobX - 24), 6, 3, t.primary());
-        rr(c, knobX - 8, 203, 16, 16, 8, 0xFFFFFFFF);
-        rr(c, knobX - 5, 206, 10, 10, 5, t.primary());
-        txt(c, "0,01 s", 22, 224, GREY);
-        String maxLabel = "4,00 s";
-        txt(c, maxLabel, 236 - textRenderer.getWidth(maxLabel), 224, GREY);
-        txt(c, "Wpisz liczbę albo przeciągnij suwak", 22, 238, mix(GREY, dark, 0.35f));
-
-        // Karta: tryb działania
-        rrb(c, 10, 258, 246, 120, 10, cardBorder, card);
-        txtShadow(c, "Tryb działania", 22, 267, WHITE);
-        modeButton(c, 22, 281, 222, "Losowe z wybranych", cfg.randomMode, t, dark);
-        modeButton(c, 22, 312, 222, "Wszystkie po kolei", !cfg.randomMode, t, dark);
-        txt(c, "Kilka zaznaczonych? Losowy tryb wybierze", 22, 346, GREY);
-        txt(c, "jeden z nich po trafieniu gracza.", 22, 356, GREY);
+        rrb(c, 10, 254, 224, 96, 16, cardBorder, card);
+        txtShadow(c, "Tryb działania", 22, 263, WHITE);
+        modeButton(c, 22, 277, 200, "Losowe z wybranych", cfg.randomMode, t, dark);
+        modeButton(c, 22, 306, 200, "Wszystkie po kolei", !cfg.randomMode, t, dark);
+        txt(c, "Kilka zaznaczonych obrotów?", 22, 336, GREY);
+        txt(c, "Losowy tryb wybierze jeden z nich.", 22, 344, GREY);
 
         // ----- Prawa kolumna -----
-        rrb(c, 264, 72, 246, 262, 10, cardBorder, card);
-        txtShadow(c, "Rodzaje obrotów", 276, 80, WHITE);
-        txt(c, "Zaznacz kilka - mod wybierze losowo", 276, 91, GREY);
-        for (int i = 0; i < ROT_LABELS.length; i++) {
-            drawRotation(c, 272, 104 + i * 25, 230, i, t, dark);
+        int gridBottom = GRID_Y + 3 * (CELL_H + GAP) - GAP;
+        rrb(c, 244, 72, 326, gridBottom - 72 + 10, 16, cardBorder, card);
+        txtShadow(c, "Rodzaje obrotów", 256, 80, WHITE);
+        txt(c, "Zaznacz kilka i ustaw kąt suwakiem", 256, 91, GREY);
+        for (int i = 0; i < ROT_LABELS.length; i++) drawRotationCell(c, i, t, dark);
+
+        int stackY = gridBottom + 18;
+        int stackHeaderH = 40, expandRowH = 20;
+        int stackCardH = stackHeaderH + expandRowH + 12 + (autostackingExpanded ? 112 : 0);
+        rrb(c, 244, stackY, 326, stackCardH, 16, cardBorder, card);
+        txtShadow(c, "Autostacking", 256, stackY + 10, WHITE);
+        txt(c, "Auto-dopełnianie hotbara i off-handu", 256, stackY + 22, GREY);
+        int hbTogW = 34, hbTogH = 18;
+        int hbTogX = 244 + 326 - 12 - hbTogW, hbTogY = stackY + 9;
+        boolean hb = cfg.hotbarRefillEnabled;
+        rr(c, hbTogX, hbTogY, hbTogW, hbTogH, hbTogH / 2, hb ? t.primary() : 0xFF39445A);
+        circle(c, hb ? hbTogX + hbTogW - 9 : hbTogX + 9, hbTogY + hbTogH / 2, 7, 0xFFFFFFFF);
+
+        int expY = stackY + stackHeaderH;
+        String arrow = autostackingExpanded ? "▾" : "▸";
+        txtShadow(c, arrow + " Dodatkowe bloki", 256, expY + 6, t.secondary());
+        String countStr = cfg.extraRefillItems.size() + " wybrane";
+        txt(c, countStr, 244 + 326 - 12 - textRenderer.getWidth(countStr), expY + 6, GREY);
+
+        if (autostackingExpanded) {
+            int searchY = expY + expandRowH + 4;
+            rrb(c, 256, searchY, 302, 18, 9, focused == Field.SEARCH ? t.primary() : 0xFF3A465F, 0xFF0C1226);
+            drawMagnifier(c, 264, searchY + 9);
+            String shown = searchQuery.isEmpty() ? "Szukaj bloku lub przedmiotu..." : searchQuery;
+            txt(c, shown, 276, searchY + 5, searchQuery.isEmpty() ? GREY : 0xFFFFFFFF);
+            if (focused == Field.SEARCH && (System.currentTimeMillis() / 500) % 2 == 0 && !searchQuery.isEmpty()) {
+                int cx = 276 + textRenderer.getWidth(searchQuery);
+                c.fill(cx, searchY + 3, cx + 1, searchY + 15, t.primary());
+            }
+
+            int listY = searchY + 22, listH = 88;
+            rr(c, 256, listY, 302, listH, 8, mix(dark, 0xFFFFFFFF, 0.04f));
+            List<Item> results = computeResults();
+            c.enableScissor(virtToScreenX(258), virtToScreenY(listY), virtToScreenX(556), virtToScreenY(listY + listH));
+            int rowH = 18;
+            int visible = listH / rowH;
+            scrollOffset = clampI(scrollOffset, 0, Math.max(0, results.size() - visible));
+            if (results.isEmpty()) {
+                txt(c, searchQuery.isEmpty() ? "Zacznij pisać, aby wyszukać..." : "Brak wyników", 262, listY + 6, GREY);
+            } else {
+                for (int row = 0; row < visible + 1 && scrollOffset + row < results.size(); row++) {
+                    Item item = results.get(scrollOffset + row);
+                    int ry = listY + row * rowH;
+                    Identifier id = Registries.ITEM.getId(item);
+                    boolean sel = id != null && cfg.extraRefillItems.contains(id.toString());
+                    if (sel) c.fill(258, ry, 556, ry + rowH, mix(dark, t.primary(), 0.18f));
+                    c.drawItem(new ItemStack(item), 262, ry + 1);
+                    circleRing(c, 302, ry + 9, 6, sel ? t.primary() : 0xFF39445A, sel ? mix(dark, t.primary(), 0.4f) : mix(dark, 0xFFFFFFFF, 0.06f));
+                    if (sel) check(c, 302, ry + 9);
+                    String name = item.getName().getString();
+                    txt(c, name, 316, ry + 5, WHITE);
+                }
+            }
+            c.disableScissor();
         }
-
-        rrb(c, 264, 340, 246, 38, 10, cardBorder, card);
-        txtShadow(c, "Po obrocie", 276, 346, WHITE);
-        txt(c, "↩ Kamera wraca w tym samym czasie", 276, 357, GREY);
-        txt(c, "360° nie wraca - to pełny obrót", 276, 367, GREY);
-
-        // ----- Dolny pasek -----
-        rrb(c, 10, 384, 500, 28, 10, cardBorder, mix(dark, t.primary(), 0.10f));
-        String key = HitSpinClient.OPEN_GUI == null ? "N" : HitSpinClient.OPEN_GUI.getBoundKeyLocalizedText().getString();
-        int kw = Math.max(16, textRenderer.getWidth(key) + 10);
-        rrb(c, 20, 390, kw, 16, 4, t.primary(), mix(dark, t.primary(), 0.35f));
-        txtShadow(c, key, 20 + kw / 2 - textRenderer.getWidth(key) / 2, 394, 0xFFFFFFFF);
-        txt(c, "Keybind - otwiera GUI moda (zmiana: Opcje > Sterowanie)", 20 + kw + 8, 394, WHITE);
-        sprite(c, t.sprite(), 478, 386, 2);
 
         m.pop();
     }
 
-    private void modeButton(DrawContext c, int x, int y, int w, String label, boolean selected, Theme t, int dark) {
-        rrb(c, x, y, w, 26, 8, selected ? t.primary() : mix(dark, 0xFFFFFFFF, 0.18f),
-                selected ? mix(dark, t.primary(), 0.32f) : mix(dark, 0xFFFFFFFF, 0.10f));
-        rr(c, x + 8, y + 8, 10, 10, 5, selected ? t.primary() : 0xFF5B6784);
-        rr(c, x + 10, y + 10, 6, 6, 3, selected ? 0xFFFFFFFF : mix(dark, 0xFFFFFFFF, 0.10f));
-        txtShadow(c, label, x + 26, y + 9, selected ? 0xFFFFFFFF : WHITE);
+    /** Przelicza wirtualną współrzędną X panelu na rzeczywisty piksel ekranu (na potrzeby enableScissor). */
+    private int virtToScreenX(int vX) { return Math.round(ox + vX * s); }
+    private int virtToScreenY(int vY) { return Math.round(oy + vY * s); }
+
+    private void drawMagnifier(DrawContext c, int cx, int cy) {
+        circleRing(c, cx, cy - 1, 4, GREY, 0x00000000);
+        for (int k = 0; k < 3; k++) c.fill(cx + 2 + k, cy + 2 + k, cx + 3 + k, cy + 3 + k, GREY);
     }
 
-    private void drawRotation(DrawContext c, int x, int y, int w, int i, Theme t, int dark) {
-        boolean sel = HitSpinClient.CONFIG.selected[i];
-        int col = ROT_COLORS[i];
-        rrb(c, x, y, w, 23, 8, sel ? col : 0xFF283048, sel ? mix(dark, col, 0.20f) : mix(dark, 0xFFFFFFFF, 0.05f));
-
-        rr(c, x + 3, y + 2, 19, 19, 9, sel ? col : 0xFF39445A);
-        String sym = ROT_SYMBOLS[i];
-        txtShadow(c, sym, x + 3 + 9 - textRenderer.getWidth(sym) / 2, y + 8, 0xFFFFFFFF);
-        txtShadow(c, ROT_LABELS[i], x + 30, y + 8, sel ? 0xFFFFFFFF : GREY);
-
-        int px = x + w - 44;
-        int cbx = px - 18;
-        if (i == 0) {
-            // Ikonka: 360° nie wraca (strzałka powrotu przekreślona)
-            int bx = x + 92;
-            rr(c, bx, y + 5, 72, 13, 6, mix(dark, t.secondary(), 0.30f));
-            txt(c, "↩", bx + 4, y + 8, 0xFFFFFFFF);
-            for (int k = 0; k < 8; k++) c.fill(bx + 3 + k, y + 16 - k, bx + 4 + k, y + 17 - k, 0xFFEF4444);
-            txt(c, "bez powrotu", bx + 14, y + 8, 0xFFFFFFFF);
+    private List<Item> computeResults() {
+        if (cachedQuery != null && cachedQuery.equals(searchQuery)) return cachedResults;
+        cachedQuery = searchQuery;
+        List<Item> out = new ArrayList<>();
+        if (!searchQuery.isBlank()) {
+            String q = searchQuery.toLowerCase(Locale.ROOT);
+            for (Identifier id : Registries.ITEM.getIds()) {
+                Item item = Registries.ITEM.get(id);
+                String path = id.getPath().replace('_', ' ');
+                if (path.contains(q) || item.getName().getString().toLowerCase(Locale.ROOT).contains(q)) {
+                    out.add(item);
+                    if (out.size() >= 60) break;
+                }
+            }
         }
-        rr(c, cbx, y + 6, 12, 12, 3, sel ? col : 0xFF39445A);
-        if (sel) check(c, cbx, y + 6);
+        cachedResults = out;
+        scrollOffset = 0;
+        return out;
+    }
 
-        rr(c, px, y + 3, 40, 17, 8, mix(dark, col, sel ? 0.45f : 0.15f));
-        sprite(c, t.sprite(), px + 14, y + 5, 1);
+    private void modeButton(DrawContext c, int x, int y, int w, String label, boolean selected, Theme t, int dark) {
+        rrb(c, x, y, w, 24, 12, selected ? t.primary() : mix(dark, 0xFFFFFFFF, 0.18f),
+                selected ? mix(dark, t.primary(), 0.32f) : mix(dark, 0xFFFFFFFF, 0.10f));
+        circleRing(c, x + 13, y + 12, 6, selected ? t.primary() : 0xFF5B6784, selected ? mix(dark, t.primary(), 0.32f) : mix(dark, 0xFFFFFFFF, 0.10f));
+        if (selected) circle(c, x + 13, y + 12, 3, 0xFFFFFFFF);
+        txtShadow(c, label, x + 26, y + 8, selected ? 0xFFFFFFFF : WHITE);
+    }
+
+    private void drawRotationCell(DrawContext c, int i, Theme t, int dark) {
+        int x = cellX(i), y = cellY(i);
+        HitSpinClient.Config cfg = HitSpinClient.CONFIG;
+        boolean sel = cfg.selected[i];
+        int col = ROT_COLORS[i];
+        rrb(c, x, y, CELL_W, CELL_H, 14, sel ? col : 0xFF283048, sel ? mix(dark, col, 0.20f) : mix(dark, 0xFFFFFFFF, 0.05f));
+
+        circle(c, x + 15, y + 15, 11, sel ? col : 0xFF39445A);
+        String sym = ROT_SYMBOLS[i];
+        txtShadow(c, sym, x + 15 - textRenderer.getWidth(sym) / 2, y + 10, 0xFFFFFFFF);
+        txt(c, ROT_LABELS[i], x + 30, y + 6, sel ? 0xFFFFFFFF : GREY);
+
+        circleRing(c, x + CELL_W - 12, y + 12, 7, sel ? col : 0xFF39445A, sel ? mix(dark, col, 0.4f) : mix(dark, 0xFFFFFFFF, 0.06f));
+        if (sel) check(c, x + CELL_W - 12, y + 12);
+
+        int max = HitSpinClient.maxDegrees(i);
+        int deg = cfg.degrees[i];
+        String degStr = deg + "°";
+        big(c, degStr, x + CELL_W / 2 - (int) (textRenderer.getWidth(degStr) * 0.6f), y + 30, 1.2f, sel ? col : GREY);
+
+        int sx = x + 10, sy = y + 58, sw = CELL_W - 20;
+        int knobX = sx + (int) ((deg - 1) / (float) Math.max(1, max - 1) * sw);
+        rr(c, sx, sy, sw, 5, 2, 0xFF26324C);
+        rr(c, sx, sy, Math.max(5, knobX - sx), 5, 2, sel ? col : 0xFF5B6784);
+        circle(c, knobX, sy + 2, 6, 0xFFFFFFFF);
+        circle(c, knobX, sy + 2, 4, sel ? col : 0xFF5B6784);
     }
 
     // ---------- Obsługa myszy ----------
@@ -374,82 +354,135 @@ public class HitSpinScreen extends Screen {
         double x = vx(mx), y = vy(my);
         HitSpinClient.Config cfg = HitSpinClient.CONFIG;
 
-        boolean hitInput = in(x, y, 150, 170, 72, 18);
-        if (!hitInput && inputFocused) commitInput();
-        if (hitInput) { inputFocused = true; return true; }
+        boolean hitDuration = in(x, y, 128, 148, 66, 18);
+        boolean hitSearch = autostackingExpanded && in(x, y, 256, searchBoxY(), 302, 18);
+        if (!hitDuration && focused == Field.DURATION) commitDuration();
+        if (!hitSearch && focused == Field.SEARCH) focused = Field.NONE;
+        if (hitDuration) { focused = Field.DURATION; return true; }
+        if (hitSearch) { focused = Field.SEARCH; return true; }
 
-        if (in(x, y, W - 44, 16, 26, 26)) { close(); return true; }
-        if (in(x, y, 22, 80, 110, 24)) { cfg.enabled = !cfg.enabled; HitSpinClient.saveConfig(); return true; }
-        if (in(x, y, 20, 198, 218, 26)) { draggingSlider = true; setDurationFromMouse(x); return true; }
-        if (in(x, y, 22, 281, 222, 26)) { cfg.randomMode = true; HitSpinClient.saveConfig(); return true; }
-        if (in(x, y, 22, 312, 222, 26)) { cfg.randomMode = false; HitSpinClient.saveConfig(); return true; }
+        if (in(x, y, W - 42, 14, 26, 26)) { close(); return true; }
+        if (in(x, y, 22, 89, 110, 20)) { cfg.enabled = !cfg.enabled; HitSpinClient.saveConfig(); return true; }
+        if (in(x, y, 24, 178, 200, 22)) { draggingDuration = true; setDurationFromMouse(x); return true; }
+        if (in(x, y, 22, 277, 200, 24)) { cfg.randomMode = true; HitSpinClient.saveConfig(); return true; }
+        if (in(x, y, 22, 306, 200, 24)) { cfg.randomMode = false; HitSpinClient.saveConfig(); return true; }
         for (int i = 0; i < THEMES.length; i++) {
-            if (in(x, y, 61 + i * 18, 49, 14, 14)) { cfg.theme = i; HitSpinClient.saveConfig(); return true; }
+            if (in(x, y, 66 + i * 20, 41, 12, 12)) { cfg.theme = i; HitSpinClient.saveConfig(); return true; }
         }
+
         for (int i = 0; i < ROT_LABELS.length; i++) {
-            if (in(x, y, 272, 104 + i * 25, 230, 23)) {
-                cfg.selected[i] = !cfg.selected[i];
-                HitSpinClient.saveConfig();
+            int cx = cellX(i), cy = cellY(i);
+            if (in(x, y, cx + 10, cy + 52, CELL_W - 20, 16)) { draggingRotation = i; setDegreeFromMouse(i, x); return true; }
+            if (in(x, y, cx, cy, CELL_W, CELL_H)) { cfg.selected[i] = !cfg.selected[i]; HitSpinClient.saveConfig(); return true; }
+        }
+
+        int gridBottom = GRID_Y + 3 * (CELL_H + GAP) - GAP;
+        int stackY = gridBottom + 18;
+        if (in(x, y, 244 + 326 - 12 - 34, stackY + 9, 34, 18)) { cfg.hotbarRefillEnabled = !cfg.hotbarRefillEnabled; HitSpinClient.saveConfig(); return true; }
+        if (in(x, y, 256, stackY + 40, 300, 20)) { autostackingExpanded = !autostackingExpanded; return true; }
+
+        if (autostackingExpanded) {
+            int listY = searchBoxY() + 22, listH = 88, rowH = 18;
+            if (in(x, y, 256, listY, 302, listH)) {
+                int row = (int) ((y - listY) / rowH);
+                List<Item> results = computeResults();
+                int idx = scrollOffset + row;
+                if (idx >= 0 && idx < results.size()) {
+                    Item item = results.get(idx);
+                    Identifier id = Registries.ITEM.getId(item);
+                    if (id != null) {
+                        String key = id.toString();
+                        if (!cfg.extraRefillItems.remove(key)) cfg.extraRefillItems.add(key);
+                        HitSpinClient.saveConfig();
+                    }
+                }
                 return true;
             }
         }
         return super.mouseClicked(mx, my, button);
     }
 
+    private int searchBoxY() {
+        int gridBottom = GRID_Y + 3 * (CELL_H + GAP) - GAP;
+        int stackY = gridBottom + 18;
+        return stackY + 40 + 20 + 4;
+    }
+
     private void setDurationFromMouse(double x) {
-        double p = clamp((x - 24) / 210.0, 0, 1);
-        double v = Math.round((0.01 + p * 3.99) * 100.0) / 100.0;
-        HitSpinClient.CONFIG.durationSeconds = clamp(v, 0.01, 4.0);
-        input = fmt(HitSpinClient.CONFIG.durationSeconds);
+        double p = clamp((x - 24) / 200.0, 0, 1);
+        double v = Math.round((0.01 + p * 1.99) * 100.0) / 100.0;
+        HitSpinClient.CONFIG.durationSeconds = clamp(v, 0.01, 2.0);
+        durationInput = fmt(HitSpinClient.CONFIG.durationSeconds);
+    }
+
+    private void setDegreeFromMouse(int i, double x) {
+        int cx = cellX(i);
+        int sx = cx + 10, sw = CELL_W - 20;
+        double p = clamp((x - sx) / (double) sw, 0, 1);
+        int max = HitSpinClient.maxDegrees(i);
+        int deg = clampI((int) Math.round(1 + p * (max - 1)), 1, max);
+        HitSpinClient.CONFIG.degrees[i] = deg;
     }
 
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
-        if (draggingSlider) {
-            layout();
-            setDurationFromMouse(vx(mx));
-            return true;
-        }
+        layout();
+        if (draggingDuration) { setDurationFromMouse(vx(mx)); return true; }
+        if (draggingRotation >= 0) { setDegreeFromMouse(draggingRotation, vx(mx)); return true; }
         return super.mouseDragged(mx, my, button, dx, dy);
     }
 
     @Override
     public boolean mouseReleased(double mx, double my, int button) {
-        if (draggingSlider) {
-            draggingSlider = false;
-            HitSpinClient.saveConfig();
-        }
+        if (draggingDuration) { draggingDuration = false; HitSpinClient.saveConfig(); }
+        if (draggingRotation >= 0) { draggingRotation = -1; HitSpinClient.saveConfig(); }
         return super.mouseReleased(mx, my, button);
     }
 
-    // ---------- Wpisywanie czasu ----------
-    private void applyInput() {
-        String v = input;
-        if (v.isEmpty() || v.equals(".")) return;
-        try {
-            HitSpinClient.CONFIG.durationSeconds = clamp(Double.parseDouble(v), 0.01, 4.0);
-        } catch (NumberFormatException ignored) {
+    @Override
+    public boolean mouseScrolled(double mx, double my, double horizontal, double vertical) {
+        if (autostackingExpanded) {
+            layout();
+            double x = vx(mx), y = vy(my);
+            int listY = searchBoxY() + 22, listH = 88;
+            if (in(x, y, 256, listY, 302, listH)) {
+                scrollOffset = clampI(scrollOffset - (int) Math.signum(vertical), 0, Math.max(0, computeResults().size() - listH / 18));
+                return true;
+            }
         }
+        return super.mouseScrolled(mx, my, horizontal, vertical);
     }
 
-    private void commitInput() {
-        applyInput();
-        input = fmt(HitSpinClient.CONFIG.durationSeconds);
-        inputFocused = false;
+    // ---------- Wpisywanie tekstu ----------
+    private void applyDurationInput() {
+        if (durationInput.isEmpty() || durationInput.equals(".")) return;
+        try {
+            HitSpinClient.CONFIG.durationSeconds = clamp(Double.parseDouble(durationInput), 0.01, 2.0);
+        } catch (NumberFormatException ignored) {}
+    }
+
+    private void commitDuration() {
+        applyDurationInput();
+        durationInput = fmt(HitSpinClient.CONFIG.durationSeconds);
+        focused = Field.NONE;
         HitSpinClient.saveConfig();
     }
 
     @Override
     public boolean charTyped(char chr, int modifiers) {
-        if (inputFocused) {
+        if (focused == Field.DURATION) {
             char ch = chr == ',' ? '.' : chr;
             if ((ch >= '0' && ch <= '9') || ch == '.') {
-                String candidate = input + ch;
+                String candidate = durationInput + ch;
                 if (candidate.matches("[0-9]?(\\.[0-9]{0,2})?")) {
-                    input = candidate;
-                    applyInput();
+                    durationInput = candidate;
+                    applyDurationInput();
                 }
             }
+            return true;
+        }
+        if (focused == Field.SEARCH) {
+            if (searchQuery.length() < 40 && chr >= 32) searchQuery += chr;
             return true;
         }
         return super.charTyped(chr, modifiers);
@@ -457,16 +490,14 @@ public class HitSpinScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (inputFocused) {
-            if (keyCode == 259) { // Backspace
-                if (!input.isEmpty()) input = input.substring(0, input.length() - 1);
-                applyInput();
-                return true;
-            }
-            if (keyCode == 257 || keyCode == 335 || keyCode == 256) { // Enter / Esc - zatwierdź i wyjdź z pola
-                commitInput();
-                return true;
-            }
+        if (focused == Field.DURATION) {
+            if (keyCode == 259) { if (!durationInput.isEmpty()) durationInput = durationInput.substring(0, durationInput.length() - 1); applyDurationInput(); return true; }
+            if (keyCode == 257 || keyCode == 335 || keyCode == 256) { commitDuration(); return true; }
+            return true;
+        }
+        if (focused == Field.SEARCH) {
+            if (keyCode == 259) { if (!searchQuery.isEmpty()) searchQuery = searchQuery.substring(0, searchQuery.length() - 1); return true; }
+            if (keyCode == 257 || keyCode == 335 || keyCode == 256) { focused = Field.NONE; return true; }
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
