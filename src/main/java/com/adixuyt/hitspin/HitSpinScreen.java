@@ -31,6 +31,7 @@ public class HitSpinScreen extends Screen {
 
     private String cachedQuery = null;
     private List<Item> cachedResults = new ArrayList<>();
+    private List<Item> allItemsSorted;
 
     private record Theme(String name, int primary, int secondary, int dark) {}
 
@@ -245,7 +246,7 @@ public class HitSpinScreen extends Screen {
             int searchY = expY + expandRowH + 4;
             rrb(c, 256, searchY, 302, 18, 9, focused == Field.SEARCH ? t.primary() : 0xFF3A465F, 0xFF0C1226);
             drawMagnifier(c, 264, searchY + 9);
-            String shown = searchQuery.isEmpty() ? "Szukaj bloku lub przedmiotu..." : searchQuery;
+            String shown = searchQuery.isEmpty() ? "Przewiń lub wpisz nazwę..." : searchQuery;
             txt(c, shown, 276, searchY + 5, searchQuery.isEmpty() ? GREY : 0xFFFFFFFF);
             if (focused == Field.SEARCH && (System.currentTimeMillis() / 500) % 2 == 0 && !searchQuery.isEmpty()) {
                 int cx = 276 + textRenderer.getWidth(searchQuery);
@@ -260,7 +261,7 @@ public class HitSpinScreen extends Screen {
             int visible = listH / rowH;
             scrollOffset = clampI(scrollOffset, 0, Math.max(0, results.size() - visible));
             if (results.isEmpty()) {
-                txt(c, searchQuery.isEmpty() ? "Zacznij pisać, aby wyszukać..." : "Brak wyników", 262, listY + 6, GREY);
+                txt(c, "Brak wyników", 262, listY + 6, GREY);
             } else {
                 for (int row = 0; row < visible + 1 && scrollOffset + row < results.size(); row++) {
                     Item item = results.get(scrollOffset + row);
@@ -291,19 +292,18 @@ public class HitSpinScreen extends Screen {
     }
 
     private List<Item> computeResults() {
+        if (allItemsSorted == null) {
+            List<Item> all = new ArrayList<>();
+            for (Identifier id : Registries.ITEM.getIds()) all.add(Registries.ITEM.get(id));
+            all.sort(java.util.Comparator.comparing(i -> i.getName().getString().toLowerCase(Locale.ROOT)));
+            allItemsSorted = all;
+        }
         if (cachedQuery != null && cachedQuery.equals(searchQuery)) return cachedResults;
         cachedQuery = searchQuery;
+        String q = searchQuery.toLowerCase(Locale.ROOT).trim();
         List<Item> out = new ArrayList<>();
-        if (!searchQuery.isBlank()) {
-            String q = searchQuery.toLowerCase(Locale.ROOT);
-            for (Identifier id : Registries.ITEM.getIds()) {
-                Item item = Registries.ITEM.get(id);
-                String path = id.getPath().replace('_', ' ');
-                if (path.contains(q) || item.getName().getString().toLowerCase(Locale.ROOT).contains(q)) {
-                    out.add(item);
-                    if (out.size() >= 60) break;
-                }
-            }
+        for (Item item : allItemsSorted) {
+            if (q.isEmpty() || item.getName().getString().toLowerCase(Locale.ROOT).contains(q)) out.add(item);
         }
         cachedResults = out;
         scrollOffset = 0;
