@@ -25,7 +25,7 @@ public class HotbarRefillClient implements ClientModInitializer {
 
             for (int i = 0; i < 9; i++) refill(client, 36 + i); // player screen hotbar slots
             refill(client, 45); // player screen off-hand slot
-            cooldown = 2;
+            cooldown = 10; // ~0.5 s - dać serwerowi czas potwierdzić zmianę, zanim wyślemy kolejną
         });
     }
 
