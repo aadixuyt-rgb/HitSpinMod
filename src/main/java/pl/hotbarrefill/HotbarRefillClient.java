@@ -4,9 +4,7 @@ import com.adixuyt.hitspin.HitSpinClient;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.util.Identifier;
@@ -61,28 +59,10 @@ public class HotbarRefillClient implements ClientModInitializer {
     }
 
     private static boolean isAllowed(ItemStack stack) {
-        Item item = stack.getItem();
-        if (item == Items.GOLDEN_APPLE || item == Items.FIREWORK_ROCKET ||
-            item == Items.BLAZE_ROD || item == Items.COBWEB) return true;
-
-        // All wool colours.
-        if (item == Items.WHITE_WOOL || item == Items.ORANGE_WOOL || item == Items.MAGENTA_WOOL ||
-            item == Items.LIGHT_BLUE_WOOL || item == Items.YELLOW_WOOL || item == Items.LIME_WOOL ||
-            item == Items.PINK_WOOL || item == Items.GRAY_WOOL || item == Items.LIGHT_GRAY_WOOL ||
-            item == Items.CYAN_WOOL || item == Items.PURPLE_WOOL || item == Items.BLUE_WOOL ||
-            item == Items.BROWN_WOOL || item == Items.GREEN_WOOL || item == Items.RED_WOOL ||
-            item == Items.BLACK_WOOL) return true;
-
-        // All banner colours.
-        if (item == Items.WHITE_BANNER || item == Items.ORANGE_BANNER || item == Items.MAGENTA_BANNER ||
-            item == Items.LIGHT_BLUE_BANNER || item == Items.YELLOW_BANNER || item == Items.LIME_BANNER ||
-            item == Items.PINK_BANNER || item == Items.GRAY_BANNER || item == Items.LIGHT_GRAY_BANNER ||
-            item == Items.CYAN_BANNER || item == Items.PURPLE_BANNER || item == Items.BLUE_BANNER ||
-            item == Items.BROWN_BANNER || item == Items.GREEN_BANNER || item == Items.RED_BANNER ||
-            item == Items.BLACK_BANNER) return true;
-
-        // Dodatkowe bloki/przedmioty wybrane ręcznie w GUI (zakładka "Autostacking").
-        Identifier id = Registries.ITEM.getId(item);
+        // Jedyne źródło prawdy to lista w GUI (zakładka "Autostacking" -> "Dodatkowe bloki").
+        // Domyślnie zawiera złote jabłko, fajerwerki, kość blaze, pajęczynę, wełnę i sztandary,
+        // ale każdy z nich można tam odznaczyć - to naprawdę je wyłącza.
+        Identifier id = Registries.ITEM.getId(stack.getItem());
         return id != null && HitSpinClient.CONFIG.extraRefillItems.contains(id.toString());
     }
 }
