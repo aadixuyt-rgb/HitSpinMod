@@ -32,31 +32,21 @@ public class HotbarRefillClient implements ClientModInitializer {
     }
 
     private static void refill(MinecraftClient client, int handlerSlot) {
-        ItemStack target = client.player.currentScreenHandler.getSlot(handlerSlot).getStack();
+        var handler = client.player.currentScreenHandler;
+        ItemStack target = handler.getSlot(handlerSlot).getStack();
         if (target.isEmpty() || target.getCount() >= target.getMaxCount() || !isAllowed(target)) return;
 
-        int need = target.getMaxCount() - target.getCount();
-        boolean started = false;
+        for (int invSlot = 9; invSlot <= 35; invSlot++) {
+            target = handler.getSlot(handlerSlot).getStack();
+            if (target.isEmpty() || target.getCount() >= target.getMaxCount()) break;
 
-        for (int invSlot = 9; invSlot <= 35 && need > 0; invSlot++) {
-            ItemStack source = client.player.currentScreenHandler.getSlot(invSlot).getStack();
+            ItemStack source = handler.getSlot(invSlot).getStack();
             if (source.isEmpty() || !ItemStack.areItemsAndComponentsEqual(target, source)) continue;
 
-            if (!started) {
-                click(client, handlerSlot, 0); // pick up the incomplete stack
-                started = true;
-            }
-
-            click(client, invSlot, 0);       // merge inventory stack into cursor
-            click(client, handlerSlot, 0);   // put the filled/remaining stack back
-
-            target = client.player.currentScreenHandler.getSlot(handlerSlot).getStack();
-            need = target.isEmpty() ? 0 : target.getMaxCount() - target.getCount();
-            if (need <= 0) break;
-            if (!client.player.currentScreenHandler.getCursorStack().isEmpty()) {
-                // A server/client desync: stop rather than touching unrelated items.
-                break;
-            }
+            // Bezpieczna kolejność: kursor zawsze kończy pusty.
+            click(client, invSlot, 0);     // 1) weź stos z plecaka na kursor (slot w plecaku pusty)
+            click(client, handlerSlot, 0); // 2) dolej kursor do celu, do jego max; nadmiar zostaje na kursorze
+            click(client, invSlot, 0);     // 3) odłóż ewentualną resztę z powrotem do (pustego) slotu w plecaku
         }
     }
 
