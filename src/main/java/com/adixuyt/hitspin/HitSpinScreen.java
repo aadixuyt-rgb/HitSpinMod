@@ -297,7 +297,11 @@ public class HitSpinScreen extends Screen {
         String q = searchQuery.toLowerCase(Locale.ROOT).trim();
         List<Item> out = new ArrayList<>();
         for (Item item : allItemsSorted) {
-            if (q.isEmpty() || item.getName().getString().toLowerCase(Locale.ROOT).contains(q)) out.add(item);
+            if (q.isEmpty()) { out.add(item); continue; }
+            String name = item.getName().getString().toLowerCase(Locale.ROOT);
+            Identifier id = Registries.ITEM.getId(item);
+            String path = id == null ? "" : id.getPath().replace('_', ' ');
+            if (name.contains(q) || path.contains(q)) out.add(item);
         }
         cachedResults = out;
         scrollOffset = 0;
@@ -373,7 +377,11 @@ public class HitSpinScreen extends Screen {
         int gridBottom = GRID_Y + 3 * (CELL_H + GAP) - GAP;
         int stackY = gridBottom + 18;
         if (in(x, y, 244 + 326 - 12 - 34, stackY + 9, 34, 18)) { cfg.hotbarRefillEnabled = !cfg.hotbarRefillEnabled; HitSpinClient.saveConfig(); return true; }
-        if (in(x, y, 256, stackY + 40, 300, 20)) { autostackingExpanded = !autostackingExpanded; return true; }
+        if (in(x, y, 256, stackY + 40, 300, 20)) {
+            autostackingExpanded = !autostackingExpanded;
+            focused = autostackingExpanded ? Field.SEARCH : Field.NONE;
+            return true;
+        }
 
         if (autostackingExpanded) {
             int listY = searchBoxY() + 22, listH = 88, rowH = 18;
@@ -440,7 +448,7 @@ public class HitSpinScreen extends Screen {
             double x = vx(mx), y = vy(my);
             int listY = searchBoxY() + 22, listH = 88;
             if (in(x, y, 256, listY, 302, listH)) {
-                scrollOffset = clampI(scrollOffset - (int) Math.signum(vertical), 0, Math.max(0, computeResults().size() - listH / 18));
+                scrollOffset = clampI(scrollOffset - (int) Math.signum(vertical) * 3, 0, Math.max(0, computeResults().size() - listH / 18));
                 return true;
             }
         }
