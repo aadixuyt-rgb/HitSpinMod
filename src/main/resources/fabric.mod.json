@@ -3,7 +3,7 @@
   "id": "hitspin",
   "version": "${version}",
   "name": "Hit Spin",
-  "description": "Camera spin effects after hitting a player, plus silent hotbar/off-hand auto-refill.",
+  "description": "Silent hotbar/off-hand auto-refill (Autostacking).",
   "authors": [
     "Adixu_YT"
   ],
@@ -15,9 +15,6 @@
       "pl.hotbarrefill.HotbarRefillClient"
     ]
   },
-  "mixins": [
-    "hitspin.mixins.json"
-  ],
   "depends": {
     "fabricloader": ">=0.16.10",
     "minecraft": "1.21.4",
