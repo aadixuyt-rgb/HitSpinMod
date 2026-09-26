@@ -256,14 +256,13 @@ public class HitSpinScreen extends Screen {
             int listY = searchY + 22, listH = 88;
             rr(c, 256, listY, 302, listH, 8, mix(dark, 0xFFFFFFFF, 0.04f));
             List<Item> results = computeResults();
-            c.enableScissor(virtToScreenX(258), virtToScreenY(listY), virtToScreenX(556), virtToScreenY(listY + listH));
             int rowH = 18;
             int visible = listH / rowH;
             scrollOffset = clampI(scrollOffset, 0, Math.max(0, results.size() - visible));
             if (results.isEmpty()) {
                 txt(c, "Brak wyników", 262, listY + 6, GREY);
             } else {
-                for (int row = 0; row < visible + 1 && scrollOffset + row < results.size(); row++) {
+                for (int row = 0; row < visible && scrollOffset + row < results.size(); row++) {
                     Item item = results.get(scrollOffset + row);
                     int ry = listY + row * rowH;
                     Identifier id = Registries.ITEM.getId(item);
@@ -276,15 +275,10 @@ public class HitSpinScreen extends Screen {
                     txt(c, name, 316, ry + 5, WHITE);
                 }
             }
-            c.disableScissor();
         }
 
         m.pop();
     }
-
-    /** Przelicza wirtualną współrzędną X panelu na rzeczywisty piksel ekranu (na potrzeby enableScissor). */
-    private int virtToScreenX(int vX) { return Math.round(ox + vX * s); }
-    private int virtToScreenY(int vY) { return Math.round(oy + vY * s); }
 
     private void drawMagnifier(DrawContext c, int cx, int cy) {
         circleRing(c, cx, cy - 1, 4, GREY, 0x00000000);
