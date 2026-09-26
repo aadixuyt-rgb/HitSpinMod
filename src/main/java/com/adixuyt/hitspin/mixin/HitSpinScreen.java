@@ -66,25 +66,28 @@ public class HitSpinScreen extends Screen {
     }
 
     // ---------- Geometria ----------
-    private record Geo(int emptyY, int emptyH, int autoY, int autoHeaderH, int expandY, int searchY, int listY, int listH, int footerY, int totalH) {}
+    private record Geo(int panelY, int toggleY, int toggleH, int div1Y, int expandY, int expandH,
+                        int searchY, int searchH, int listY, int listH, int div2Y, int footerY, int footerH,
+                        int panelBottom, int totalH) {}
 
     private Geo geo() {
-        int y = 10;
-        y += 76 + 14;               // nagłówek
-
-        // Tu wcześniej były ustawienia obrotu kamery (Hit Spin) - celowo puste miejsce.
-        int emptyY = y, emptyH = 40;
-        y += emptyH + 14;
-
-        int autoY = y;
-        int autoHeaderH = 40, expandY = autoY + autoHeaderH;
-        y += autoHeaderH + 22;
-        int searchY = expandY + 22, listY = searchY + 24, listH = 130;
-        if (autostackingExpanded) y += 24 + listH;
-        y += 14;
-        int footerY = y; y += 30;
-        int totalH = y + 10;
-        return new Geo(emptyY, emptyH, autoY, autoHeaderH, expandY, searchY, listY, listH, footerY, totalH);
+        int headerBottom = 10 + 76;
+        int panelY = headerBottom + 14;
+        int toggleY = panelY + 14, toggleH = 34;
+        int div1Y = toggleY + toggleH + 10;
+        int expandY = div1Y + 10, expandH = 22;
+        int y = expandY + expandH;
+        int searchY = 0, searchH = 26, listY = 0, listH = 140;
+        if (autostackingExpanded) {
+            searchY = y + 10;
+            listY = searchY + searchH + 8;
+            y = listY + listH;
+        }
+        int div2Y = y + 14;
+        int footerY = div2Y + 10, footerH = 34;
+        int panelBottom = footerY + footerH + 14;
+        int totalH = panelBottom + 10;
+        return new Geo(panelY, toggleY, toggleH, div1Y, expandY, expandH, searchY, searchH, listY, listH, div2Y, footerY, footerH, panelBottom, totalH);
     }
 
     private void layout() {
@@ -115,6 +118,11 @@ public class HitSpinScreen extends Screen {
     private void rrb(DrawContext c, int x, int y, int w, int h, int r, int border, int fill) {
         rr(c, x, y, w, h, r, border);
         rr(c, x + 1, y + 1, w - 2, h - 2, Math.max(0, r - 1), fill);
+    }
+
+    /** Miękki cień pod kartą, żeby panel nie wyglądał płasko/kwadratowo. */
+    private void shadow(DrawContext c, int x, int y, int w, int h, int r) {
+        rr(c, x - 1, y + 3, w + 2, h + 3, r + 1, 0x2E000000);
     }
 
     private void vgrad(DrawContext c, int x, int y, int w, int h, int r, int top, int bottom) {
@@ -177,10 +185,11 @@ public class HitSpinScreen extends Screen {
         m.translate(ox, oy, 0f);
         m.scale(s, s, 1f);
 
-        rrb(c, 0, 0, W, g.totalH(), 26, mix(dark, t.primary(), 0.5f), dark);
+        rrb(c, 0, 0, W, g.totalH(), 32, mix(dark, t.primary(), 0.5f), dark);
 
         // Nagłówek
-        vgrad(c, 10, 10, W - 20, 76, 22, mix(dark, t.primary(), 0.30f), mix(dark, t.primary(), 0.08f));
+        shadow(c, 10, 10, W - 20, 76, 24);
+        vgrad(c, 10, 10, W - 20, 76, 24, mix(dark, t.primary(), 0.30f), mix(dark, t.primary(), 0.08f));
         circle(c, 46, 48, 22, mix(dark, t.primary(), 0.35f));
         txtShadow(c, "⚙", 46 - textRenderer.getWidth("⚙") / 2, 42, t.primary());
         big(c, "Hit Spin", 78, 20, 2f, t.primary());
@@ -194,35 +203,42 @@ public class HitSpinScreen extends Screen {
         circle(c, W - 33, 33, 13, hoverClose ? 0xFFB91C1C : 0x33000000);
         txtShadow(c, "×", W - 33 - textRenderer.getWidth("×") / 2, 27, 0xFFFFFFFF);
 
-        // Puste miejsce - tu wcześniej było ustawianie obrotu kamery (usunięte, niedozwolone na serwerze).
-        rr(c, PAD, g.emptyY(), CW, g.emptyH(), 16, mix(dark, 0xFFFFFFFF, 0.03f));
+        // Panel ustawień - jedna spójna karta z cienkimi liniami zamiast osobnych ramek.
+        shadow(c, PAD, g.panelY(), CW, g.panelBottom() - g.panelY(), 20);
+        rrb(c, PAD, g.panelY(), CW, g.panelBottom() - g.panelY(), 20, cardBorder, card);
 
-        // Autostacking
-        rrb(c, PAD, g.autoY(), CW, g.footerY() - g.autoY() - 14, 20, cardBorder, card);
-        txtShadow(c, "Autostacking", PAD + 16, g.autoY() + 10, WHITE);
-        txt(c, "Auto-dopełnianie hotbara i off-handu", PAD + 16, g.autoY() + 22, GREY);
-        int hbTogW = 38, hbTogH = 20;
-        int hbTogX = PAD + CW - 14 - hbTogW, hbTogY = g.autoY() + 12;
+        // Autostacking - wiersz z przełącznikiem
+        txtShadow(c, "Autostacking", PAD + 18, g.toggleY() + 4, WHITE);
+        txt(c, "Auto-dopełnianie hotbara i off-handu", PAD + 18, g.toggleY() + 16, GREY);
         boolean hb = cfg.hotbarRefillEnabled;
-        rr(c, hbTogX, hbTogY, hbTogW, hbTogH, hbTogH / 2, hb ? t.primary() : 0xFF39445A);
-        circle(c, hb ? hbTogX + hbTogW - 10 : hbTogX + 10, hbTogY + hbTogH / 2, 8, 0xFFFFFFFF);
+        int togW = 30, togH = 24;
+        int togX = PAD + CW - 18 - togW, togY = g.toggleY() + (g.toggleH() - togH) / 2;
+        rr(c, togX, togY, togW, togH, 9, hb ? t.primary() : mix(dark, 0xFFFFFFFF, 0.10f));
+        String togGlyph = hb ? "✓" : "×";
+        txtShadow(c, togGlyph, togX + togW / 2 - textRenderer.getWidth(togGlyph) / 2, togY + togH / 2 - 4, hb ? dark : GREY);
 
+        c.fill(PAD + 14, g.div1Y(), PAD + CW - 14, g.div1Y() + 1, mix(dark, 0xFFFFFFFF, 0.08f));
+
+        // Dodatkowe bloki - wiersz rozwijany
         String arrow = autostackingExpanded ? "▾" : "▸";
-        txtShadow(c, arrow + " Dodatkowe bloki", PAD + 16, g.expandY() + 6, t.secondary());
-        String countStr = cfg.extraRefillItems.size() + " wybrane";
-        txt(c, countStr, PAD + CW - 14 - textRenderer.getWidth(countStr), g.expandY() + 6, GREY);
+        txtShadow(c, arrow + " Dodatkowe bloki", PAD + 18, g.expandY() + 6, t.secondary());
+        String countStr = String.valueOf(cfg.extraRefillItems.size());
+        int badgeW = Math.max(22, textRenderer.getWidth(countStr) + 12);
+        int badgeX = PAD + CW - 18 - badgeW, badgeY = g.expandY() + 3;
+        rr(c, badgeX, badgeY, badgeW, 16, 8, t.primary());
+        txtShadow(c, countStr, badgeX + badgeW / 2 - textRenderer.getWidth(countStr) / 2, badgeY + 4, dark);
 
         if (autostackingExpanded) {
-            rrb(c, PAD + 14, g.searchY(), CW - 28, 20, 10, focused == Field.SEARCH ? t.primary() : 0xFF3A465F, 0xFF0C1226);
-            drawMagnifier(c, PAD + 26, g.searchY() + 10);
+            rrb(c, PAD + 14, g.searchY(), CW - 28, g.searchH(), 13, focused == Field.SEARCH ? t.primary() : 0xFF3A465F, 0xFF0C1226);
+            drawMagnifier(c, PAD + 27, g.searchY() + g.searchH() / 2);
             String shown = searchQuery.isEmpty() ? "Przewiń lub wpisz nazwę..." : searchQuery;
-            txt(c, shown, PAD + 40, g.searchY() + 6, searchQuery.isEmpty() ? GREY : 0xFFFFFFFF);
+            txt(c, shown, PAD + 40, g.searchY() + 9, searchQuery.isEmpty() ? GREY : 0xFFFFFFFF);
             if (focused == Field.SEARCH && (System.currentTimeMillis() / 500) % 2 == 0 && !searchQuery.isEmpty()) {
                 int cx = PAD + 40 + textRenderer.getWidth(searchQuery);
-                c.fill(cx, g.searchY() + 4, cx + 1, g.searchY() + 16, t.primary());
+                c.fill(cx, g.searchY() + 6, cx + 1, g.searchY() + g.searchH() - 6, t.primary());
             }
 
-            rr(c, PAD + 14, g.listY(), CW - 28, g.listH(), 12, mix(dark, 0xFFFFFFFF, 0.04f));
+            rr(c, PAD + 14, g.listY(), CW - 28, g.listH(), 14, mix(dark, 0xFFFFFFFF, 0.04f));
             List<Item> results = computeResults();
             int rowH = 20;
             int visible = g.listH() / rowH;
@@ -235,22 +251,23 @@ public class HitSpinScreen extends Screen {
                     int ry = g.listY() + row * rowH;
                     Identifier id = Registries.ITEM.getId(item);
                     boolean sel = id != null && cfg.extraRefillItems.contains(id.toString());
-                    if (sel) rr(c, PAD + 16, ry + 1, CW - 32, rowH - 2, 8, mix(dark, t.primary(), 0.18f));
-                    c.drawItem(new ItemStack(item), PAD + 20, ry + 2);
-                    circleRing(c, PAD + 48, ry + 10, 7, sel ? t.primary() : 0xFF39445A, sel ? mix(dark, t.primary(), 0.4f) : mix(dark, 0xFFFFFFFF, 0.06f));
-                    if (sel) check(c, PAD + 48, ry + 10);
-                    txt(c, item.getName().getString(), PAD + 64, ry + 6, WHITE);
+                    if (sel) rr(c, PAD + 18, ry + 1, CW - 36, rowH - 2, 10, mix(dark, t.primary(), 0.18f));
+                    c.drawItem(new ItemStack(item), PAD + 22, ry + 2);
+                    circleRing(c, PAD + 50, ry + 10, 7, sel ? t.primary() : 0xFF39445A, sel ? mix(dark, t.primary(), 0.4f) : mix(dark, 0xFFFFFFFF, 0.06f));
+                    if (sel) check(c, PAD + 50, ry + 10);
+                    txt(c, item.getName().getString(), PAD + 66, ry + 6, WHITE);
                 }
             }
         }
 
+        c.fill(PAD + 14, g.div2Y(), PAD + CW - 14, g.div2Y() + 1, mix(dark, 0xFFFFFFFF, 0.08f));
+
         // Stopka - keybind
-        rrb(c, PAD, g.footerY(), CW, 30, 15, cardBorder, mix(dark, t.primary(), 0.08f));
         String key = HitSpinClient.OPEN_GUI == null ? "N" : HitSpinClient.OPEN_GUI.getBoundKeyLocalizedText().getString();
-        int kw = Math.max(18, textRenderer.getWidth(key) + 12);
-        rrb(c, PAD + 10, g.footerY() + 5, kw, 18, 9, t.primary(), mix(dark, t.primary(), 0.35f));
-        txtShadow(c, key, PAD + 10 + kw / 2 - textRenderer.getWidth(key) / 2, g.footerY() + 9, 0xFFFFFFFF);
-        txt(c, "otwiera GUI moda (zmiana: Opcje > Sterowanie)", PAD + 10 + kw + 10, g.footerY() + 9, GREY);
+        int kw = Math.max(20, textRenderer.getWidth(key) + 14);
+        rr(c, PAD + 18, g.footerY() + (g.footerH() - 20) / 2, kw, 20, 10, t.primary());
+        txtShadow(c, key, PAD + 18 + kw / 2 - textRenderer.getWidth(key) / 2, g.footerY() + g.footerH() / 2 - 4, dark);
+        txt(c, "otwiera GUI moda (zmiana: Opcje > Sterowanie)", PAD + 18 + kw + 10, g.footerY() + g.footerH() / 2 - 4, GREY);
 
         m.pop();
     }
@@ -260,22 +277,29 @@ public class HitSpinScreen extends Screen {
         for (int k = 0; k < 3; k++) c.fill(cx + 2 + k, cy + 2 + k, cx + 3 + k, cy + 3 + k, GREY);
     }
 
+    /** Usuwa polskie/inne znaki diakrytyczne (ź->z, ł->l, ó->o...), żeby szukanie działało bez ogonków. */
+    private static String plain(String s) {
+        String norm = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "");
+        return norm.replace('ł', 'l').replace('Ł', 'L').toLowerCase(Locale.ROOT);
+    }
+
     private List<Item> computeResults() {
         if (allItemsSorted == null) {
             List<Item> all = new ArrayList<>();
             for (Identifier id : Registries.ITEM.getIds()) all.add(Registries.ITEM.get(id));
-            all.sort(java.util.Comparator.comparing(it -> it.getName().getString().toLowerCase(Locale.ROOT)));
+            all.sort(java.util.Comparator.comparing(it -> plain(it.getName().getString())));
             allItemsSorted = all;
         }
         if (cachedQuery != null && cachedQuery.equals(searchQuery)) return cachedResults;
         cachedQuery = searchQuery;
-        String q = searchQuery.toLowerCase(Locale.ROOT).trim();
+        String q = plain(searchQuery.trim());
         List<Item> out = new ArrayList<>();
         for (Item item : allItemsSorted) {
             if (q.isEmpty()) { out.add(item); continue; }
-            String name = item.getName().getString().toLowerCase(Locale.ROOT);
+            String name = plain(item.getName().getString());
             Identifier id = Registries.ITEM.getId(item);
-            String path = id == null ? "" : id.getPath().replace('_', ' ');
+            String path = id == null ? "" : plain(id.getPath().replace('_', ' '));
             if (name.contains(q) || path.contains(q)) out.add(item);
         }
         cachedResults = out;
@@ -292,7 +316,7 @@ public class HitSpinScreen extends Screen {
         double x = vx(mx), y = vy(my);
         HitSpinClient.Config cfg = HitSpinClient.CONFIG;
 
-        boolean hitSearch = autostackingExpanded && in(x, y, PAD + 14, g.searchY(), CW - 28, 20);
+        boolean hitSearch = autostackingExpanded && in(x, y, PAD + 14, g.searchY(), CW - 28, g.searchH());
         if (!hitSearch && focused == Field.SEARCH) focused = Field.NONE;
         if (hitSearch) { focused = Field.SEARCH; return true; }
 
@@ -301,10 +325,9 @@ public class HitSpinScreen extends Screen {
             if (in(x, y, 78 + i * 20, 55, 14, 14)) { cfg.theme = i; HitSpinClient.saveConfig(); return true; }
         }
 
-        int hbTogW = 38;
-        int hbTogX = PAD + CW - 14 - hbTogW, hbTogY = g.autoY() + 12;
-        if (in(x, y, hbTogX, hbTogY, hbTogW, 20)) { cfg.hotbarRefillEnabled = !cfg.hotbarRefillEnabled; HitSpinClient.saveConfig(); return true; }
-        if (in(x, y, PAD + 14, g.expandY(), CW - 28, 20)) {
+        int togW = 30, togX = PAD + CW - 18 - togW, togY = g.toggleY() + (g.toggleH() - 24) / 2;
+        if (in(x, y, togX, togY, togW, 24)) { cfg.hotbarRefillEnabled = !cfg.hotbarRefillEnabled; HitSpinClient.saveConfig(); return true; }
+        if (in(x, y, PAD + 14, g.expandY(), CW - 28, g.expandH())) {
             autostackingExpanded = !autostackingExpanded;
             focused = autostackingExpanded ? Field.SEARCH : Field.NONE;
             return true;
