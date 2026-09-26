@@ -188,6 +188,23 @@ public class HitSpinClient implements ClientModInitializer {
         public int[] degrees = {360, 90, 90, 90, 90, 90, 90, 90, 90};
         // Ustawienia modułu Autostacking (dopełniania hotbara/off-handu).
         public boolean hotbarRefillEnabled = true;
-        public Set<String> extraRefillItems = new LinkedHashSet<>();
+        public Set<String> extraRefillItems = defaultRefillItems();
+
+        private static Set<String> defaultRefillItems() {
+            Set<String> s = new LinkedHashSet<>();
+            String[] defaults = {
+                "minecraft:golden_apple", "minecraft:firework_rocket", "minecraft:blaze_rod", "minecraft:cobweb",
+                "minecraft:white_wool", "minecraft:orange_wool", "minecraft:magenta_wool", "minecraft:light_blue_wool",
+                "minecraft:yellow_wool", "minecraft:lime_wool", "minecraft:pink_wool", "minecraft:gray_wool",
+                "minecraft:light_gray_wool", "minecraft:cyan_wool", "minecraft:purple_wool", "minecraft:blue_wool",
+                "minecraft:brown_wool", "minecraft:green_wool", "minecraft:red_wool", "minecraft:black_wool",
+                "minecraft:white_banner", "minecraft:orange_banner", "minecraft:magenta_banner", "minecraft:light_blue_banner",
+                "minecraft:yellow_banner", "minecraft:lime_banner", "minecraft:pink_banner", "minecraft:gray_banner",
+                "minecraft:light_gray_banner", "minecraft:cyan_banner", "minecraft:purple_banner", "minecraft:blue_banner",
+                "minecraft:brown_banner", "minecraft:green_banner", "minecraft:red_banner", "minecraft:black_banner"
+            };
+            for (String id : defaults) s.add(id);
+            return s;
+        }
     }
 }
